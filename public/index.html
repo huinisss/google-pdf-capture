@@ -3,114 +3,261 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Google Search PDF Capture</title>
+<title>Search Capture</title>
 <style>
-  :root { --bg:#eef1f4; --panel:#fff; --ink:#14212b; --muted:#5d6b77; --line:#cfd6dc; --accent:#0f6b6b; --bad:#a3262a; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 "Segoe UI", system-ui, sans-serif; }
-  main { max-width:880px; margin:0 auto; padding:32px 20px 60px; }
-  h1 { font-size:24px; margin:0 0 4px; }
-  p.sub { margin:0 0 24px; color:var(--muted); }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:640px){ .grid{grid-template-columns:1fr;} }
-  label { display:block; font-weight:600; margin-bottom:6px; }
-  small { color:var(--muted); font-weight:400; }
-  textarea, input[type=text] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font:inherit; background:var(--panel); color:var(--ink); }
-  textarea { height:230px; resize:vertical; }
-  textarea:focus, input:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-  .row { margin-top:16px; }
-  .check { display:flex; gap:8px; align-items:flex-start; font-weight:400; }
-  .check input { margin-top:5px; }
-  .bar { display:flex; align-items:center; gap:16px; margin-top:20px; }
-  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:11px 22px; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { background:#8aa7a7; cursor:not-allowed; }
-  #count { color:var(--muted); }
-  #progress { margin-top:24px; display:none; }
-  .track { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
-  .fill { height:100%; width:0; background:var(--accent); transition:width .3s; }
-  #log { margin-top:12px; background:#101c24; color:#d3e3ea; padding:12px 14px; border-radius:6px; height:220px; overflow:auto; font:12.5px/1.6 Consolas, monospace; white-space:pre-wrap; }
-  #msg { color:var(--bad); margin-top:12px; }
+  :root {
+    color-scheme: light;
+    --bg:#f5f2fc; --panel:#ffffff; --ink:#2b2d42; --muted:#7b7e98; --line:#e4e0f2; --soft:#eeeafa;
+    --accent:#aebbf5; --accent-ink:#232950; --accent-text:#5a6bc6;
+    --ok:#3f9d78; --bad:#d65f77; --warn-bg:#fff2cc; --warn-ink:#7a5b00;
+    --code-bg:#33365a; --code-ink:#e6e9ff;
+    --c1:#ffe2e8; --c2:#dff3e9; --c3:#e3e8ff; --c4:#fff0d0;
+    --sky:#eaf3ff; --peach:#ffd9c9; --mint:#bfe8d4; --lav:#cfc6f5;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 "Segoe UI Variable","Segoe UI",system-ui,sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 56px; }
+  header { margin-bottom:22px; }
+  h1 { font-size:22px; margin:0; letter-spacing:-.01em; }
+  header p { margin:2px 0 0; color:var(--muted); }
+  .layout { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr); gap:20px; align-items:start; }
+  @media (max-width:860px){ .layout{grid-template-columns:1fr;} }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; }
+  .card + .card { margin-top:16px; }
+  .card h2 { font-size:15px; margin:0 0 2px; }
+  .hint { color:var(--muted); font-size:13px; margin:0 0 10px; }
+  textarea, input[type=text] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:7px; font:inherit; background:var(--bg); color:var(--ink); }
+  textarea { height:170px; resize:vertical; line-height:1.55; }
+  textarea:focus, input:focus { outline:2px solid var(--accent-text); outline-offset:1px; background:var(--panel); }
+  button:focus-visible, summary:focus-visible { outline:2px solid var(--accent-text); outline-offset:2px; }
+  .meta { display:flex; justify-content:space-between; color:var(--muted); font-size:12.5px; margin-top:6px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; padding:8px; border:1px solid var(--line); border-radius:7px; background:var(--bg); }
+  .chips:focus-within { outline:2px solid var(--accent-text); outline-offset:1px; background:var(--panel); }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:var(--soft); border:1px solid var(--line); border-radius:999px; padding:3px 6px 3px 12px; font-size:14px; }
+  .chip button { all:unset; cursor:pointer; width:20px; height:20px; border-radius:50%; text-align:center; line-height:20px; color:var(--muted); }
+  .chip button:hover { background:var(--line); color:var(--ink); }
+  .chips input { flex:1; min-width:140px; border:0; background:transparent; padding:4px; font:inherit; color:var(--ink); outline:0; }
+
+  .opt { display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
+  .opt input { margin-top:5px; }
+  .opt small { display:block; color:var(--muted); }
+
+  aside { position:sticky; top:16px; }
+  @media (max-width:860px){ aside{position:static;} }
+  .big { font-size:38px; font-weight:650; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .big span { font-size:15px; font-weight:400; color:var(--muted); letter-spacing:0; margin-left:4px; }
+  .sub { color:var(--muted); margin:4px 0 12px; font-variant-numeric:tabular-nums; }
+  .files { margin:0 0 14px; padding:10px 12px; background:var(--bg); border:1px dashed var(--line); border-radius:7px; font-size:12.5px; color:var(--muted); word-break:break-word; }
+  .files div + div { margin-top:4px; }
+  .files:empty { display:none; }
+  #go { width:100%; background:var(--accent); color:var(--accent-ink); border:0; border-radius:8px; padding:12px; font:inherit; font-weight:650; cursor:pointer; }
+  #go:disabled { opacity:.45; cursor:not-allowed; }
+  #stop { display:none; width:100%; margin-top:8px; background:transparent; color:var(--bad); border:1px solid var(--bad); border-radius:8px; padding:10px; font:inherit; font-weight:650; cursor:pointer; }
+  #stop:disabled { opacity:.5; cursor:not-allowed; }
+  #msg { color:var(--bad); font-size:13.5px; margin-top:10px; min-height:0; }
+
+  #run { display:none; margin-top:16px; }
+  .track { height:8px; background:var(--soft); border-radius:4px; overflow:hidden; }
+  .fill { height:100%; width:0; background:var(--accent); transition:width .4s; }
+  .fill.done { background:var(--ok); }
+  .stat { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin:8px 0 10px; font-variant-numeric:tabular-nums; }
+  .banner { display:none; background:var(--warn-bg); color:var(--warn-ink); border-radius:7px; padding:9px 12px; font-size:13.5px; margin-bottom:10px; }
+  #results { list-style:none; margin:0; padding:0; max-height:260px; overflow:auto; border-top:1px solid var(--line); }
+  #results li { display:flex; gap:9px; padding:7px 2px; border-bottom:1px solid var(--soft); font-size:13.5px; word-break:break-word; }
+  #results .ic { flex:none; width:16px; font-weight:700; }
+  .ok .ic { color:var(--ok); } .fail .ic { color:var(--bad); }
+  .fail .why { display:block; color:var(--bad); font-size:12.5px; }
+  details { margin-top:12px; }
+  summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  #log { margin-top:8px; background:var(--code-bg); color:var(--code-ink); padding:10px 12px; border-radius:7px; height:150px; overflow:auto; font:12px/1.6 Consolas,monospace; white-space:pre-wrap; }
+
+  /* pastel accents */
+  .card { border-radius:14px; box-shadow:0 2px 10px rgba(120,110,170,.08); }
+  .layout > div > .card { border-top:5px solid var(--lav); }
+  .layout > div > .card:nth-child(1) { border-top-color:var(--peach); }
+  .layout > div > .card:nth-child(2) { border-top-color:var(--mint); }
+  .layout > div > .card:nth-child(3) { border-top-color:var(--lav); }
+  aside .card { background:var(--sky); border-top:5px solid var(--accent); }
+  .chip { border-color:transparent; color:var(--ink); }
+  .chip:nth-of-type(4n+1) { background:var(--c1); }
+  .chip:nth-of-type(4n+2) { background:var(--c2); }
+  .chip:nth-of-type(4n+3) { background:var(--c3); }
+  .chip:nth-of-type(4n+4) { background:var(--c4); }
+  #go { border-radius:12px; box-shadow:0 2px 0 rgba(90,107,198,.25); }
+  #go:not(:disabled):hover { filter:brightness(.96); }
+  #stop { border-radius:12px; }
+  .fill { background:linear-gradient(90deg,var(--accent),var(--mint)); }
+  .fill.done { background:var(--mint); }
+  .track { background:var(--panel); }
+  .files, #results { background:var(--panel); }
+  .files { border-radius:10px; }
 </style>
 </head>
 <body>
-<main>
-  <h1>Google Search PDF Capture</h1>
-  <p class="sub">Each company is searched with each keyword. Every result page is saved as a PDF.</p>
+<div class="wrap">
+  <header>
+    <h1>Search Capture</h1>
+    <p>Search every company with every keyword on Google and save each result page as a PDF.</p>
+  </header>
 
-  <div class="grid">
+  <div class="layout">
     <div>
-      <label for="companies">Companies <small>one per line</small></label>
-      <textarea id="companies" placeholder="Company A&#10;Company B&#10;Company C"></textarea>
+      <section class="card">
+        <h2>Companies</h2>
+        <p class="hint">One company per line. You can paste a column straight from Excel.</p>
+        <textarea id="companies" placeholder="Company A&#10;Company B&#10;Company C" spellcheck="false"></textarea>
+        <div class="meta"><span id="cc">0 companies</span><button type="button" id="clearC" style="all:unset;cursor:pointer;color:var(--accent-text)">Clear</button></div>
+      </section>
+
+      <section class="card">
+        <h2>Keywords</h2>
+        <p class="hint">Type a keyword and press Enter. Click × to remove one.</p>
+        <div class="chips" id="chips"><input id="kwIn" type="text" placeholder="Add keyword…" aria-label="Add keyword"></div>
+      </section>
+
+      <section class="card">
+        <h2>Save location</h2>
+        <p class="hint">PDFs are saved here. The folder is created if it doesn’t exist.</p>
+        <input type="text" id="folder" placeholder="C:\Users\YourName\Documents\Search PDFs" spellcheck="false">
+        <label class="opt" style="margin-top:14px">
+          <input type="checkbox" id="show">
+          <span>Show the browser window<small>Tick this if Google asks you to solve a CAPTCHA.</small></span>
+        </label>
+      </section>
     </div>
-    <div>
-      <label for="keywords">Keywords <small>one per line, edit freely</small></label>
-      <textarea id="keywords">Reprimand
-Guilty
-Bribery
-Fraud</textarea>
-    </div>
-  </div>
 
-  <div class="row">
-    <label for="folder">Save folder</label>
-    <input type="text" id="folder" placeholder="C:\Users\YourName\Documents\Search PDFs">
-  </div>
+    <aside>
+      <section class="card">
+        <div class="big" id="big">0<span>PDFs</span></div>
+        <div class="sub" id="sub">Add companies and keywords to begin.</div>
+        <div class="files" id="files"></div>
+        <button id="go" disabled>Start capture</button>
+        <button id="stop" type="button">Stop</button>
+        <div id="msg" role="alert"></div>
 
-  <div class="row">
-    <label class="check"><input type="checkbox" id="show">
-      <span>Show browser window <small>(tick this if Google asks you to solve a CAPTCHA)</small></span></label>
+        <div id="run">
+          <div class="banner" id="banner"></div>
+          <div class="track"><div class="fill" id="fill"></div></div>
+          <div class="stat"><span id="pct">0 of 0</span><span id="eta"></span></div>
+          <ul id="results"></ul>
+          <details><summary>Technical log</summary><div id="log"></div></details>
+        </div>
+      </section>
+    </aside>
   </div>
-
-  <div class="bar">
-    <button id="go">Start capture</button>
-    <span id="count"></span>
-  </div>
-  <div id="msg" role="alert"></div>
-
-  <div id="progress">
-    <div class="track"><div class="fill" id="fill"></div></div>
-    <div id="log" aria-live="polite"></div>
-  </div>
-</main>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const lines = (id) => [...new Set($(id).value.split('\n').map(s => s.trim()).filter(Boolean))];
-let timer;
+const DEFAULT_KW = ['Reprimand', 'Guilty', 'Bribery', 'Fraud'];
+const store = { get:(k,d)=>{ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+                set:(k,v)=>{ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+let keywords = store.get('keywords', DEFAULT_KW);
+let running = false, startedAt = 0, timer;
 
-function updateCount() {
-  const c = lines('companies').length, k = lines('keywords').length;
-  $('count').textContent = c && k ? `${c} companies × ${k} keywords = ${c * k} PDFs` : '';
-}
-['companies', 'keywords'].forEach(id => $(id).addEventListener('input', updateCount));
-$('folder').value = localStorage.getItem('folder') || '';
-updateCount();
+const clean = (a) => [...new Set(a.map(s => s.trim()).filter(Boolean))];
+const companies = () => clean($('companies').value.split('\n'));
+const fileName = (c, k) => `${c} ${k} - Google Search.pdf`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, ' ');
+const fmt = (s) => s < 60 ? `${Math.max(1, Math.round(s))}s` : `${Math.floor(s/60)}m ${Math.round(s%60)}s`;
 
-async function poll() {
-  const s = await (await fetch('/api/status')).json();
-  $('fill').style.width = (s.total ? s.done / s.total * 100 : 0) + '%';
-  $('log').textContent = s.log.join('\n');
-  $('log').scrollTop = $('log').scrollHeight;
-  if (!s.running) { clearInterval(timer); $('go').disabled = false; $('go').textContent = 'Start capture'; }
+function drawChips() {
+  const input = $('kwIn');
+  [...$('chips').querySelectorAll('.chip')].forEach(n => n.remove());
+  keywords.forEach((k, i) => {
+    const c = document.createElement('span'); c.className = 'chip';
+    const t = document.createElement('span'); t.textContent = k;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '×'; b.setAttribute('aria-label', 'Remove ' + k);
+    b.onclick = () => { keywords.splice(i, 1); changed(); };
+    c.append(t, b); $('chips').insertBefore(c, input);
+  });
 }
+function addKeywords(text) {
+  keywords = clean([...keywords, ...text.split(/[\n,]/)]); $('kwIn').value = ''; changed();
+}
+$('kwIn').addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ',') && e.target.value.trim()) { e.preventDefault(); addKeywords(e.target.value); }
+  else if (e.key === 'Backspace' && !e.target.value && keywords.length) { keywords.pop(); changed(); }
+});
+$('kwIn').addEventListener('blur', (e) => { if (e.target.value.trim()) addKeywords(e.target.value); });
+$('kwIn').addEventListener('paste', (e) => { const t = e.clipboardData.getData('text'); if (/[\n,]/.test(t)) { e.preventDefault(); addKeywords(t); } });
+
+function changed() {
+  const cs = companies(), total = cs.length * keywords.length;
+  drawChips();
+  $('cc').textContent = `${cs.length} ${cs.length === 1 ? 'company' : 'companies'}`;
+  $('big').innerHTML = `${total}<span>${total === 1 ? 'PDF' : 'PDFs'}</span>`;
+  $('sub').textContent = total ? `${cs.length} × ${keywords.length} keywords · about ${fmt(total * 8)}` : 'Add companies and keywords to begin.';
+  const names = [];
+  outer: for (const c of cs) for (const k of keywords) { names.push(fileName(c, k)); if (names.length === 3) break outer; }
+  $('files').replaceChildren(...names.map(n => Object.assign(document.createElement('div'), { textContent: n })),
+    ...(total > 3 ? [Object.assign(document.createElement('div'), { textContent: `+ ${total - 3} more` })] : []));
+  $('go').disabled = running || !total || !$('folder').value.trim();
+  store.set('keywords', keywords); store.set('companies', $('companies').value); store.set('folder', $('folder').value);
+}
+$('companies').addEventListener('input', changed);
+$('folder').addEventListener('input', changed);
+$('clearC').onclick = () => { $('companies').value = ''; changed(); $('companies').focus(); };
+
+function render(s) {
+  const done = s.done, total = s.total;
+  $('fill').style.width = (total ? done / total * 100 : 0) + '%';
+  $('pct').textContent = `${done} of ${total} done`;
+  if (s.running && done > 0) $('eta').textContent = `about ${fmt((Date.now() - startedAt) / 1000 / done * (total - done))} left`;
+  else $('eta').textContent = s.running ? 'starting…' : `took ${fmt((Date.now() - startedAt) / 1000)}`;
+
+  const rows = [];
+  s.log.forEach((line) => {
+    let m;
+    if ((m = line.match(/Saved: (.+)$/))) rows.push({ ok: true, name: m[1] });
+    else if ((m = line.match(/FAILED: (.+?) - (.+)$/))) rows.push({ ok: false, name: m[1], why: m[2] });
+  });
+  $('results').replaceChildren(...rows.reverse().map(r => {
+    const li = document.createElement('li'); li.className = r.ok ? 'ok' : 'fail';
+    const ic = Object.assign(document.createElement('span'), { className: 'ic', textContent: r.ok ? '✓' : '✕' });
+    const tx = document.createElement('span'); tx.textContent = r.name;
+    if (!r.ok) tx.append(Object.assign(document.createElement('span'), { className: 'why', textContent: r.why }));
+    li.append(ic, tx); return li;
+  }));
+
+  const last = s.log[s.log.length - 1] || '';
+  const cap = s.running && /CAPTCHA detected/.test(last);
+  $('banner').style.display = cap ? 'block' : 'none';
+  if (cap) $('banner').textContent = 'Google is asking for a CAPTCHA. Solve it in the browser window and the capture will continue.';
+  $('log').textContent = s.log.join('\n'); $('log').scrollTop = $('log').scrollHeight;
+
+  if (!s.running && running) {
+    running = false; clearInterval(timer); changed();
+    $('go').textContent = 'Start capture';
+    $('stop').style.display = 'none'; $('stop').disabled = false; $('stop').textContent = 'Stop';
+    if (!s.stopped) $('fill').classList.add('done');
+    const failed = rows.filter(r => !r.ok).length;
+    if (s.stopped) $('sub').textContent = `Stopped after ${s.done} of ${s.total}. Saved PDFs are kept.`;
+    else $('sub').textContent = failed ? `Finished with ${failed} failed. Check the list below.` : 'Finished. All PDFs saved.';
+  }
+}
+async function poll() { try { render(await (await fetch('/api/status')).json()); } catch {} }
 
 $('go').addEventListener('click', async () => {
   $('msg').textContent = '';
-  localStorage.setItem('folder', $('folder').value);
-  const res = await fetch('/api/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      companies: lines('companies'), keywords: lines('keywords'),
-      folder: $('folder').value, showBrowser: $('show').checked
-    })
-  });
+  const res = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companies: companies(), keywords, folder: $('folder').value, showBrowser: $('show').checked }) });
   const data = await res.json();
   if (!res.ok) { $('msg').textContent = data.error; return; }
+  running = true; startedAt = Date.now(); changed();
   $('go').disabled = true; $('go').textContent = 'Running…';
-  $('progress').style.display = 'block';
+  $('run').style.display = 'block'; $('fill').classList.remove('done');
+  $('stop').style.display = 'block';
   timer = setInterval(poll, 1000); poll();
 });
+
+$('stop').addEventListener('click', async () => {
+  $('stop').disabled = true; $('stop').textContent = 'Stopping…';
+  await fetch('/api/stop', { method: 'POST' }).catch(() => {});
+});
+
+$('companies').value = store.get('companies', ''); $('folder').value = store.get('folder', '');
+changed();
 </script>
 </body>
 </html>

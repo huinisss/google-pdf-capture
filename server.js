@@ -7,7 +7,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const state = { running: false, total: 0, done: 0, log: [] };
+const state = { running: false, stopped: false, total: 0, done: 0, log: [] };
+let stopRequested = false;
+let activeCtx = null;
 const log = (m) => { state.log.push(`${new Date().toLocaleTimeString()}  ${m}`); console.log(m); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -70,7 +72,8 @@ async function savePdf(page, file, title, query) {
 }
 
 async function run({ companies, keywords, folder, showBrowser }) {
-  state.running = true; state.done = 0; state.log = [];
+  state.running = true; state.stopped = false; state.done = 0; state.log = [];
+  stopRequested = false;
   state.total = companies.length * keywords.length;
   fs.mkdirSync(folder, { recursive: true });
 
@@ -79,12 +82,15 @@ async function run({ companies, keywords, folder, showBrowser }) {
   let ctx;
   try { ctx = await chromium.launchPersistentContext(profile, { ...opts, channel: 'chrome' }); }
   catch { ctx = await chromium.launchPersistentContext(profile, opts); }
+  activeCtx = ctx;
   const page = ctx.pages()[0] || (await ctx.newPage());
   await page.emulateMedia({ media: 'screen' });
 
   try {
+    outer:
     for (const company of companies) {
       for (const keyword of keywords) {
+        if (stopRequested) break outer;
         const title = `${company} ${keyword} - Google Search`;
         const file = path.join(folder, safeName(title) + '.pdf');
         const url = `https://www.google.com/search?q=${encodeURIComponent(`${company} ${keyword}`)}&hl=en`;
@@ -110,6 +116,7 @@ async function run({ companies, keywords, folder, showBrowser }) {
           await savePdf(page, file, title, `${company} ${keyword}`);
           log(`Saved: ${path.basename(file)}`);
         } catch (e) {
+          if (stopRequested) break outer; // browser was closed on purpose
           log(`FAILED: ${title} - ${e.message}`);
         }
         state.done++;
@@ -117,9 +124,11 @@ async function run({ companies, keywords, folder, showBrowser }) {
       }
     }
   } finally {
-    await ctx.close();
+    await ctx.close().catch(() => {});
+    activeCtx = null;
+    state.stopped = stopRequested;
     state.running = false;
-    log(`Finished. ${state.done}/${state.total} processed.`);
+    log(stopRequested ? `Stopped. ${state.done}/${state.total} processed.` : `Finished. ${state.done}/${state.total} processed.`);
   }
 }
 
@@ -134,6 +143,14 @@ app.post('/api/start', (req, res) => {
   run({ companies, keywords, folder, showBrowser: !!req.body.showBrowser })
     .catch((e) => { log(`ERROR: ${e.message}`); state.running = false; });
   res.json({ ok: true, total: companies.length * keywords.length });
+});
+
+app.post('/api/stop', (_req, res) => {
+  if (!state.running) return res.json({ ok: true });
+  stopRequested = true;
+  log('Stop requested - closing the browser...');
+  if (activeCtx) activeCtx.close().catch(() => {}); // interrupts a search or CAPTCHA wait in progress
+  res.json({ ok: true });
 });
 
 app.get('/api/status', (_req, res) => res.json(state));
