@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google Search PDF Capture</title>
+<style>
+  :root { --bg:#eef1f4; --panel:#fff; --ink:#14212b; --muted:#5d6b77; --line:#cfd6dc; --accent:#0f6b6b; --bad:#a3262a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  p.sub { margin:0 0 24px; color:var(--muted); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:640px){ .grid{grid-template-columns:1fr;} }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  small { color:var(--muted); font-weight:400; }
+  textarea, input[type=text] { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font:inherit; background:var(--panel); color:var(--ink); }
+  textarea { height:230px; resize:vertical; }
+  textarea:focus, input:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .row { margin-top:16px; }
+  .check { display:flex; gap:8px; align-items:flex-start; font-weight:400; }
+  .check input { margin-top:5px; }
+  .bar { display:flex; align-items:center; gap:16px; margin-top:20px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:11px 22px; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { background:#8aa7a7; cursor:not-allowed; }
+  #count { color:var(--muted); }
+  #progress { margin-top:24px; display:none; }
+  .track { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
+  .fill { height:100%; width:0; background:var(--accent); transition:width .3s; }
+  #log { margin-top:12px; background:#101c24; color:#d3e3ea; padding:12px 14px; border-radius:6px; height:220px; overflow:auto; font:12.5px/1.6 Consolas, monospace; white-space:pre-wrap; }
+  #msg { color:var(--bad); margin-top:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Google Search PDF Capture</h1>
+  <p class="sub">Each company is searched with each keyword. Every result page is saved as a PDF.</p>
+
+  <div class="grid">
+    <div>
+      <label for="companies">Companies <small>one per line</small></label>
+      <textarea id="companies" placeholder="Company A&#10;Company B&#10;Company C"></textarea>
+    </div>
+    <div>
+      <label for="keywords">Keywords <small>one per line, edit freely</small></label>
+      <textarea id="keywords">Reprimand
+Guilty
+Bribery
+Fraud</textarea>
+    </div>
+  </div>
+
+  <div class="row">
+    <label for="folder">Save folder</label>
+    <input type="text" id="folder" placeholder="C:\Users\YourName\Documents\Search PDFs">
+  </div>
+
+  <div class="row">
+    <label class="check"><input type="checkbox" id="show">
+      <span>Show browser window <small>(tick this if Google asks you to solve a CAPTCHA)</small></span></label>
+  </div>
+
+  <div class="bar">
+    <button id="go">Start capture</button>
+    <span id="count"></span>
+  </div>
+  <div id="msg" role="alert"></div>
+
+  <div id="progress">
+    <div class="track"><div class="fill" id="fill"></div></div>
+    <div id="log" aria-live="polite"></div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const lines = (id) => [...new Set($(id).value.split('\n').map(s => s.trim()).filter(Boolean))];
+let timer;
+
+function updateCount() {
+  const c = lines('companies').length, k = lines('keywords').length;
+  $('count').textContent = c && k ? `${c} companies × ${k} keywords = ${c * k} PDFs` : '';
+}
+['companies', 'keywords'].forEach(id => $(id).addEventListener('input', updateCount));
+$('folder').value = localStorage.getItem('folder') || '';
+updateCount();
+
+async function poll() {
+  const s = await (await fetch('/api/status')).json();
+  $('fill').style.width = (s.total ? s.done / s.total * 100 : 0) + '%';
+  $('log').textContent = s.log.join('\n');
+  $('log').scrollTop = $('log').scrollHeight;
+  if (!s.running) { clearInterval(timer); $('go').disabled = false; $('go').textContent = 'Start capture'; }
+}
+
+$('go').addEventListener('click', async () => {
+  $('msg').textContent = '';
+  localStorage.setItem('folder', $('folder').value);
+  const res = await fetch('/api/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      companies: lines('companies'), keywords: lines('keywords'),
+      folder: $('folder').value, showBrowser: $('show').checked
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) { $('msg').textContent = data.error; return; }
+  $('go').disabled = true; $('go').textContent = 'Running…';
+  $('progress').style.display = 'block';
+  timer = setInterval(poll, 1000); poll();
+});
+</script>
+</body>
+</html>
