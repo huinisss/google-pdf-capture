@@ -78,7 +78,10 @@ async function run({ companies, keywords, folder, showBrowser }) {
   fs.mkdirSync(folder, { recursive: true });
 
   const profile = path.join(__dirname, '.browser-profile');
-  const opts = { headless: !showBrowser, viewport: { width: 1280, height: 900 }, locale: 'en-US' };
+  const headless = !showBrowser || (process.platform === 'linux' && !process.env.DISPLAY);
+  if (showBrowser && headless)
+    log('No X server is available; using headless mode. CAPTCHA challenges must be solved locally.');
+  const opts = { headless, viewport: { width: 1280, height: 900 }, locale: 'en-US' };
   let ctx;
   try { ctx = await chromium.launchPersistentContext(profile, { ...opts, channel: 'chrome' }); }
   catch { ctx = await chromium.launchPersistentContext(profile, opts); }
@@ -105,7 +108,8 @@ async function run({ companies, keywords, folder, showBrowser }) {
 
           // CAPTCHA ("unusual traffic")
           if (page.url().includes('/sorry/')) {
-            if (!showBrowser) throw new Error('Google showed a CAPTCHA. Re-run with "Show browser" ticked and solve it.');
+            if (headless)
+              throw new Error('Google showed a CAPTCHA, but this server is running headless and cannot open a browser window. Run the app locally with "Show browser" enabled to solve it.');
             log('CAPTCHA detected - solve it in the browser window (waiting up to 3 min)...');
             await page.waitForURL((u) => !u.href.includes('/sorry/'), { timeout: 180000 });
             await page.goto(url, { waitUntil: 'domcontentloaded' });
